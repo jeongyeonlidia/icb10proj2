@@ -1,0 +1,74 @@
+# 파이썬 캐시 파일 및 컴파일된 바이너리
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 가상환경 폴더 (uv 및 기본 가상환경)
+.venv/
+venv/
+env/
+ENV/
+pyenv/
+
+# Jupyter Notebook 관련 파일 및 체크포인트
+.ipynb_checkpoints
+*/.ipynb_checkpoints/
+.ipython/
+.jupyter/
+
+# 데이터 분석 데이터 파일 (대용량 파일 배제)
+data/
+datasets/
+raw_data/
+processed_data/
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.json
+*.jsonl
+*.parquet
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.npy
+*.npz
+
+# 대용량 모델 파일 및 모델 체크포인트
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.onnx
+*.pb
+
+# 로그 및 런타임 결과물
+*.log
+logs/
+reports/
+figures/
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.html
+
+# 환경 변수 및 설정 파일 (API 키 등 보안 정보 보호)
+.env
+.env.*
+.secrets
+
+# IDE 및 에디터 설정
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# 운영체제 생성 파일
+.DS_Store
+Thumbs.db
