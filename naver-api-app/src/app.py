@@ -72,9 +72,20 @@ st.markdown("""
 # 2. 사이드바 - API 키 수신 및 공통 설정
 st.sidebar.markdown("# 🔑 네이버 API 설정")
 
-# 환경 변수(.env)에서 네이버 API 인증 키 직접 로드
-client_id = os.getenv("NAVER_CLIENT_ID", "").strip()
-client_secret = os.getenv("NAVER_CLIENT_SECRET", "").strip()
+client_id = ""
+client_secret = ""
+
+# 1. Streamlit Secrets(배포 환경용) 우선 로드
+if "NAVER_CLIENT_ID" in st.secrets:
+    client_id = st.secrets["NAVER_CLIENT_ID"].strip()
+if "NAVER_CLIENT_SECRET" in st.secrets:
+    client_secret = st.secrets["NAVER_CLIENT_SECRET"].strip()
+
+# 2. 로컬 환경 변수(.env) 백업 로드
+if not client_id:
+    client_id = os.getenv("NAVER_CLIENT_ID", "").strip()
+if not client_secret:
+    client_secret = os.getenv("NAVER_CLIENT_SECRET", "").strip()
 
 # ASCII 인코딩 검증을 통한 헤더 인코딩 에러(UnicodeEncodeError) 원천 차단
 is_valid_keys = True
@@ -86,15 +97,16 @@ if client_id or client_secret:
             client_secret.encode('ascii')
     except UnicodeEncodeError:
         is_valid_keys = False
-        st.sidebar.error("⚠️ Client ID와 Secret은 영문, 숫자, 아스키 문자만 포함해야 합니다. .env 파일에 한글이나 보이지 않는 유니코드 공백문자가 섞여있는지 확인해 주세요.")
+        st.sidebar.error("⚠️ Client ID와 Secret은 영문, 숫자, 아스키 문자만 포함해야 합니다. 설정값에 한글이나 보이지 않는 유니코드 공백문자가 섞여있는지 확인해 주세요.")
         client_id = ""
         client_secret = ""
 
-# API 상태 표시기
+# API 상태 표시기 및 로드 소스 표시
 if client_id and client_secret and is_valid_keys:
-    st.sidebar.success("🟢 API 인증 정보 로드 완료 (From .env)")
+    source = "Secrets" if "NAVER_CLIENT_ID" in st.secrets else ".env"
+    st.sidebar.success(f"🟢 API 인증 정보 로드 완료 (From {source})")
 else:
-    st.sidebar.error("🔴 .env 파일에 네이버 API 인증 정보(ID, Secret)를 기입해 주세요.")
+    st.sidebar.error("🔴 Streamlit Secrets 혹은 .env 파일에 네이버 API 인증 정보를 기입해 주세요.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("# ⚙️ 공통 분석 필터")
@@ -177,9 +189,10 @@ if menu == "🏠 홈 및 사용 가이드":
         본 대시보드는 네이버 오픈 API를 실시간으로 호출하여 트렌드 정보, 상품 검색, 블로그, 카페글, 뉴스 기사를 다각도로 수집하고 분석할 수 있는 종합 비즈니스 시각화 도구입니다.
         
         #### ⚙️ 시작 방법:
-        1. 루트 디렉토리의 **.env** 파일에 **NAVER_CLIENT_ID**와 **NAVER_CLIENT_SECRET**을 기입합니다.
-        2. 공통 필터(조회 기간, 검색 키워드)를 정의합니다.
-        3. 왼쪽 페이지 목록에서 원하는 분석 영역을 클릭하여 모니터링을 개시합니다.
+        1. **로컬 실행**: 루트 디렉토리의 **.env** 파일에 **NAVER_CLIENT_ID**와 **NAVER_CLIENT_SECRET**을 기입합니다.
+        2. **배포 환경**: Streamlit Cloud의 **Secrets** 관리 탭에 동일 키들을 기입합니다.
+        3. 공통 필터(조회 기간, 검색 키워드)를 정의합니다.
+        4. 왼쪽 페이지 목록에서 원하는 분석 영역을 클릭하여 모니터링을 개시합니다.
         """)
     
     with col2:
@@ -214,7 +227,7 @@ elif menu == "📊 검색어 트렌드 분석":
     st.markdown("<div class='main-title'>📊 네이버 검색어 트렌드 분석</div>", unsafe_allow_html=True)
     
     if not client_id or not client_secret:
-        st.warning("👉 대시보드를 활성화하기 위해 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
+        st.warning("👉 대시보드를 활성화하기 위해 Streamlit Secrets 또는 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
     elif len(keywords) == 0:
         st.info("💡 사이드바에 검색 키워드를 입력해 주세요.")
     else:
@@ -319,7 +332,7 @@ elif menu == "📈 쇼핑 클릭 트렌드":
     st.markdown("<div class='main-title'>📈 네이버 쇼핑 클릭 트렌드 분석</div>", unsafe_allow_html=True)
     
     if not client_id or not client_secret:
-        st.warning("👉 대시보드를 활성화하기 위해 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
+        st.warning("👉 대시보드를 활성화하기 위해 Streamlit Secrets 또는 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
     elif len(keywords) == 0:
         st.info("💡 사이드바에 검색 키워드를 입력해 주세요.")
     else:
@@ -424,7 +437,7 @@ elif menu == "🛒 쇼핑 상품 검색":
     st.markdown("<div class='main-title'>🛒 네이버 쇼핑 상품 검색 및 가격 분석</div>", unsafe_allow_html=True)
     
     if not client_id or not client_secret:
-        st.warning("👉 대시보드를 활성화하기 위해 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
+        st.warning("👉 대시보드를 활성화하기 위해 Streamlit Secrets 또는 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
     elif len(keywords) == 0:
         st.info("💡 사이드바에 검색 키워드를 입력해 주세요.")
     else:
@@ -509,7 +522,7 @@ elif menu == "📝 블로그 검색 분석":
     st.markdown("<div class='main-title'>📝 블로그 검색 데이터 분석</div>", unsafe_allow_html=True)
     
     if not client_id or not client_secret:
-        st.warning("👉 대시보드를 활성화하기 위해 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
+        st.warning("👉 대시보드를 활성화하기 위해 Streamlit Secrets 또는 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
     elif len(keywords) == 0:
         st.info("💡 사이드바에 검색 키워드를 입력해 주세요.")
     else:
@@ -586,7 +599,7 @@ elif menu == "☕ 카페글 검색 분석":
     st.markdown("<div class='main-title'>☕ 카페글 검색 데이터 분석</div>", unsafe_allow_html=True)
     
     if not client_id or not client_secret:
-        st.warning("👉 대시보드를 활성화하기 위해 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
+        st.warning("👉 대시보드를 활성화하기 위해 Streamlit Secrets 또는 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
     elif len(keywords) == 0:
         st.info("💡 사이드바에 검색 키워드를 입력해 주세요.")
     else:
@@ -650,7 +663,7 @@ elif menu == "📰 뉴스 검색 분석":
     st.markdown("<div class='main-title'>📰 뉴스 검색 트렌드 분석</div>", unsafe_allow_html=True)
     
     if not client_id or not client_secret:
-        st.warning("👉 대시보드를 활성화하기 위해 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
+        st.warning("👉 대시보드를 활성화하기 위해 Streamlit Secrets 또는 프로젝트 루트의 .env 파일에 Client ID 및 Client Secret을 입력해 주세요.")
     elif len(keywords) == 0:
         st.info("💡 사이드바에 검색 키워드를 입력해 주세요.")
     else:
