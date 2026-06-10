@@ -59,6 +59,12 @@ figures/
 .env
 .env.*
 .secrets
+*.config
+*.conf
+config.json
+config.yaml
+config.yml
+*.ini
 
 # IDE 및 에디터 설정
 .vscode/
