@@ -1,3 +1,21 @@
+# 🚀 Naver API Streamlit Dashboard Project
+
+## 🔗 Streamlit 배포 주소
+- **URL**: https://icb10proj2-qjbtmkcp8mykjtg5yzycap.streamlit.app/
+
+## 🛠️ 현재 프로젝트 작업 내역
+1. **Streamlit 대시보드 구축 및 가동**:
+   - [naver-api-app/src/app.py](file:///C:/Users/admin/Desktop/icb10proj2/naver-api-app/src/app.py)를 진입점으로 하는 네이버 API 연동형 데이터 시각화/대시보드 앱 구현
+   - 로컬 구동 명령어: `& .venv\Scripts\python.exe -m streamlit run naver-api-app/src/app.py --server.port 8501 --server.address 127.0.0.1`
+
+2. **환경변수 및 비밀 키 설정 (Secrets)**:
+   - 네이버 API 호출용 키(`NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`)를 [.streamlit/secrets.toml](file:///C:/Users/admin/Desktop/icb10proj2/.streamlit/secrets.toml)에 배치하고 `.gitignore`에 등록하여 키 보안 확보
+
+3. **Git Auto-Push Hook 설정**:
+   - [.git/hooks/post-commit](file:///C:/Users/admin/Desktop/icb10proj2/.git/hooks/post-commit) 훅을 구축하여 로컬에서 `git commit`을 수행하면 자동으로 `git push origin HEAD`가 수행되도록 자동화 완료
+
+---
+
 ## STEP 0. 팀 구성 및 협업 환경 세팅
 
 ### 슬랙 세팅
