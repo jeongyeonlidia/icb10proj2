@@ -323,6 +323,100 @@ elif menu == "📊 검색어 트렌드 분석":
                     
                     skew_desc = "우측으로 꼬리가 길며 대부분 낮은 수치를 유지하다가 간헐적으로 강하게 검색되는 형태" if skewness > 0 else "좌측으로 꼬리가 길고 대체로 높은 검색 비중을 유지하는 형태"
                     st.write(f"💡 **{kw}**: 최대 검색 비중은 **{max_ratio}** 이며, 평균적인 검색 지수는 **{avg_ratio}** 입니다. 분포의 비대칭도(왜도)가 **{skewness}**인 것으로 보아, **{skew_desc}**를 띱니다.")
+                
+                # 4. 미래 예측 및 What-if 시뮬레이션 섹션
+                st.markdown("---")
+                st.markdown("<div class='sub-title'>🔮 미래 트렌드 예측 및 What-if 시뮬레이션</div>", unsafe_allow_html=True)
+                st.write("과거 검색 트렌드 데이터를 기반으로 선형 추세를 분석하고, 마케팅 효과 등의 가중치를 반영하여 향후 트렌드를 시뮬레이션합니다.")
+                
+                sim_col1, sim_col2 = st.columns(2)
+                with sim_col1:
+                    pred_days = st.slider("예측 기간 설정 (일)", min_value=10, max_value=90, value=30, step=10)
+                with sim_col2:
+                    growth_rate = st.slider(
+                        "마케팅 및 성장 가중치 (%)", 
+                        min_value=-50, 
+                        max_value=50, 
+                        value=0, 
+                        step=5,
+                        help="미래 트렌드 기울기에 반영할 성장 시너지 가중치입니다. 양수이면 성장이 가속화되고, 음수이면 성장세가 둔화됩니다."
+                    )
+                
+                # 예측 시뮬레이션 차트 생성 (Plotly go 사용)
+                fig_sim = go.Figure()
+                colors = px.colors.qualitative.Plotly
+                
+                last_date = df_pivot['period'].max()
+                future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=pred_days)
+                
+                # 과거 데이터의 총 일수 계산 (기울기 계산 시점용)
+                x_past = np.arange(len(df_pivot))
+                x_future = np.arange(len(df_pivot), len(df_pivot) + pred_days)
+                
+                st.markdown("##### 💡 시나리오 기반 예측 결과 코멘트")
+                
+                for idx, col in enumerate(df_pivot.columns):
+                    if col == 'period':
+                        continue
+                    
+                    series = df_pivot[col].values
+                    # 결측치 보정 (선형 회귀 적합용으로 dropna 처리한 x, y 쌍 구성)
+                    valid_idx = ~pd.isna(series)
+                    x_valid = x_past[valid_idx]
+                    y_valid = series[valid_idx]
+                    
+                    if len(y_valid) < 2:
+                        continue
+                        
+                    # 선형 회귀 계수 구하기 (1차 다항식)
+                    slope, intercept = np.polyfit(x_valid, y_valid, 1)
+                    
+                    # 마케팅 가중치 반영 기울기 조정
+                    adjusted_slope = slope * (1 + growth_rate / 100.0)
+                    
+                    # 예측값 계산 및 0~100 범위 바인딩
+                    pred_y = adjusted_slope * x_future + intercept
+                    pred_y = np.clip(pred_y, 0.0, 100.0)
+                    
+                    color = colors[idx % len(colors)]
+                    
+                    # 1. 과거 실측 데이터 추가 (실선)
+                    fig_sim.add_trace(go.Scatter(
+                        x=df_pivot['period'],
+                        y=series,
+                        mode='lines',
+                        name=f"{col} (실측)",
+                        line=dict(color=color, width=2.5)
+                    ))
+                    
+                    # 2. 미래 예측 데이터 추가 (점선)
+                    # 시각적 연속성을 위해 과거 마지막 데이터포인트를 미래 데이터 처음에 결합
+                    last_past_val = series[-1] if not pd.isna(series[-1]) else y_valid[-1]
+                    comb_dates = [df_pivot['period'].iloc[-1]] + list(future_dates)
+                    comb_pred_y = [last_past_val] + list(pred_y)
+                    
+                    fig_sim.add_trace(go.Scatter(
+                        x=comb_dates,
+                        y=comb_pred_y,
+                        mode='lines',
+                        name=f"{col} (예측)",
+                        line=dict(color=color, width=2, dash='dash')
+                    ))
+                    
+                    # 키워드별 코멘트 생성
+                    final_pred_val = np.round(pred_y[-1], 2)
+                    trend_dir = "상승" if adjusted_slope > 0 else "하락" if adjusted_slope < 0 else "보합"
+                    st.write(f"- 📢 **{col}**: {pred_days}일 뒤 예상 검색 비중 지수는 **{final_pred_val}** (추세: **{trend_dir}**)으로 전망됩니다.")
+                
+                fig_sim.update_layout(
+                    title=f"미래 트렌드 예측 시뮬레이션 (성장 가중치: {growth_rate}%)",
+                    xaxis_title="기간",
+                    yaxis_title="검색 비중 (0~100)",
+                    hovermode="x unified",
+                    legend_title_text="범례",
+                    template="plotly_white"
+                )
+                st.plotly_chart(fig_sim, use_container_width=True)
             else:
                 st.warning("⚠️ 조회 조건에 일치하는 데이터가 데이터 소스 내에 존재하지 않습니다.")
         else:
