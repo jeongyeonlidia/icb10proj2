@@ -1,0 +1,197 @@
+=== [1. 초기 데이터 검토] ===
+총 행 수: 600개
+총 열 수: 13개
+중복 레코드 수: 0개
+
+--- 결측치 정보 ---
+company                0
+company_type           0
+title                  0
+link                   0
+sectors                0
+work_place             0
+career                 0
+education              0
+salary                 0
+deadline               0
+reg_info               0
+reg_days_ago           0
+posting_period_days    0
+dtype: int64
+
+--- 데이터 Head(5) ---
+                         company company_type                                  title                                                                                                                      link                              sectors    work_place           career education   salary   deadline   reg_info  reg_days_ago posting_period_days
+0                  쿠팡로지스틱스서비스(유)          대기업  [최대4340+참석비10]쿠팡CLS지게차(입출고 오퍼레이터)전국채용                               https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=public-recruit&rec_idx=54229077      배송기사, 화물차(카고), 전동지게차, 지게차, 물류관리  충북 청주시 서원구 외       경력무관 · 계약직      학력무관  면접 후 협의        D-2  22시간 전 등록             0                   2
+1                  해비치호텔앤드리조트(주)          대기업       [해비치호텔앤드리조트] 전사 현장 서비스직 신입/경력 채용  https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=public-recruit&rec_idx=54228176&adsCategoryItem=effect_bold&     응급구조사, 응급실, 관광가이드, 관광통역안내사, 바리스타     제주 서귀포시 외  신입 · 경력 · 정규직 외       고졸↑  면접 후 협의  ~07.12(일)  23시간 전 등록             0                  21
+2  의료법의료법인 한국의료재단 종합검진센터(여의도IFC)         일반기업               [한국의료재단] 예방의학사업부(영업팀) 채용  https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=public-recruit&rec_idx=54227720&adsCategoryItem=effect_bold&         검진센터, 영업관리, 영업지원, 영업직, 영업마케팅     서울 영등포구 외    신입 · 경력 · 정규직  대학교(4년)↑  면접 후 협의  ~07.02(목)  23시간 전 수정             0                  11
+3                       SK텔레콤(주)          대기업                         정산 및 통계 지원 담당자                               https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=public-recruit&rec_idx=54226984          ERP, 전표입력, 정산관리, 요금정산, 구매관리         서울 중구         신입 · 계약직      학력무관  면접 후 협의        D-3    1일 전 등록             1                   4
+4                       SK텔레콤(주)          대기업                     스마트홈 서비스 현장 지원 담당자                               https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=public-recruit&rec_idx=54226913  SE(시스템엔지니어), 네트워크, 전표입력, 매출관리, CS관리         서울 중구         신입 · 계약직      학력무관  면접 후 협의        D-3    1일 전 등록             1                   4
+
+--- 데이터 Tail(5) ---
+       company company_type                                 title                                                                                         link                        sectors work_place         career  education   salary   deadline reg_info  reg_days_ago posting_period_days
+595  한국과학기술연구원       공사·공기업  KIST 2026-3차 기간제(관리원) 공개채용(휴머노이드연구단)  https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=public-recruit&rec_idx=54144200                사무행정, R&D, 기술연구     서울 성북구     경력무관 · 계약직       학력무관  면접 후 협의        D-4  9일 전 등록             9                  13
+596     인천교통공사       공사·공기업           직무능력중심 신입사원 채용공고 (기계설비(기계))  https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=public-recruit&rec_idx=54144151  기계조작원, 기계설계, 예산관리, 수/발주, 기계기사       인천전체       신입 · 정규직       학력무관  면접 후 협의        D-3  9일 전 등록             9                  12
+597  남해종합건설(주)          대기업           남해종합건설㈜ 토목/건축/안전/재무 경력사원 채용  https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=public-recruit&rec_idx=54144116  더존, 관리회계, 법인세신고, 부가세신고, Excel       전국 외  신입 · 경력 · 정규직  대학(2,3년)↑  면접 후 협의  ~06.30(화)  9일 전 등록             9                  18
+598     인천교통공사       공사·공기업                 직무능력중심 신입사원 채용공고 (토목)  https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=public-recruit&rec_idx=54144063              토목기술자, 토목건축, 토목공사       인천전체       신입 · 정규직       학력무관  면접 후 협의        D-3  9일 전 등록             9                  12
+599     인천교통공사       공사·공기업                 직무능력중심 신입사원 채용공고 (전자)  https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=public-recruit&rec_idx=54143918           유지보수, 발권, 요금정산, 전자제어       인천전체       신입 · 정규직       학력무관  면접 후 협의        D-3  9일 전 등록             9                  12
+============================
+
+=== [2. 기술 통계] ===
+
+--- 수치형 기술 통계 (reg_days_ago, posting_period_days) ---
+       reg_days_ago  posting_period_days
+count    600.000000           536.000000
+mean       4.075000            12.869403
+std        2.599481             7.772809
+min        0.000000             2.000000
+25%        2.000000             9.000000
+50%        3.500000            12.000000
+75%        5.000000            14.000000
+max        9.000000            59.000000
+
+--- 범주형 기술 통계 (company_type, education, work_place, career, salary) ---
+
+[company_type 빈도표]
+company_type
+대기업       260
+일반기업      225
+공사·공기업     50
+코스닥        31
+외국계        25
+코스피         9
+Name: count, dtype: int64
+
+[education 빈도표]
+education
+학력무관         319
+대학교(4년)↑     138
+고졸↑           79
+대학(2,3년)↑     53
+석사↑           11
+Name: count, dtype: int64
+
+[work_place 빈도표]
+work_place
+서울 강남구        72
+경기 성남시 분당구    48
+서울 중구         13
+서울 영등포구       13
+서울 서초구        10
+서울 종로구        10
+경남 양산시         9
+서울 구로구         8
+서울 강남구 외       8
+경기 화성시 외       8
+Name: count, dtype: int64
+
+[career 빈도표]
+career
+신입 · 경력 · 정규직      131
+경력무관 · 계약직         104
+경력무관 · 인턴직          63
+신입 · 정규직            56
+신입 · 경력 · 정규직 외     46
+신입 · 경력 · 계약직       38
+신입 · 인턴직            37
+경력무관 · 정규직          29
+신입 · 계약직            28
+신입 · 정규직 외          26
+Name: count, dtype: int64
+
+[salary 빈도표]
+salary
+면접 후 협의    597
+220 만원       1
+216 만원       1
+350 만원       1
+Name: count, dtype: int64
+========================
+
+=== [3. 데이터 시각화 생성 시작] ===
+차트 1 저장 완료: 01_company_type_dist.png
+차트 2 저장 완료: 02_education_dist.png
+차트 3 저장 완료: 03_work_place_dist.png
+차트 4 저장 완료: 04_career_dist.png
+차트 5 저장 완료: 05_reg_days_ago_hist.png
+차트 6 저장 완료: 06_posting_period_box.png
+차트 7 저장 완료: 07_company_vs_period_bar.png
+차트 8 저장 완료: 08_title_tfidf_bar.png
+차트 9 저장 완료: 09_sectors_tfidf_bar.png
+차트 10 저장 완료: 10_company_vs_education_heatmap.png
+=== [데이터 시각화 완료] ===
+
+--- [Title TF-IDF Table] ---
+   word     score
+     채용 88.843353
+     신입 45.107196
+  2026년 41.211678
+     모집 36.541034
+   채용공고 32.658410
+     공고 31.063596
+     경력 29.405913
+     인턴 28.801166
+    계약직 23.538565
+     직원 21.235221
+    체험형 19.831249
+      및 18.999690
+   2026 16.362180
+   청년인턴 16.123830
+   공개채용 15.686877
+      각 15.085073
+    하반기 14.249577
+    정규직 13.663053
+   신입사원 13.228277
+   경력사원 12.982957
+    기간제 12.574578
+manager 11.915059
+    담당자 11.624969
+     부문 10.987979
+    부문별 10.473415
+ nh농협은행 10.417881
+     6월 10.353012
+   수시채용 10.163357
+      주 10.145389
+     지원  9.901233
+
+--- [Sectors TF-IDF Table] ---
+   word     score
+    사무직 33.941006
+   사무행정 32.261975
+   사무보조 31.307173
+   문서작성 22.367905
+   시설관리 21.035271
+     총무 18.535609
+   생산관리 17.352900
+   인공지능 14.973168
+     ai 14.973168
+   영업관리 13.864868
+  기계조작원 13.452285
+   대학병원 13.336593
+   기술지원 12.501285
+  마케팅기획 12.179358
+  데이터분석 12.098432
+      r 11.953328
+   영업지원 11.858971
+  단순생산직 11.856303
+ 데이터분석가 11.818307
+   일반병원 11.558427
+  품질검사원 11.407061
+   금융사무 11.303925
+  안전관리자 11.245163
+     기획 11.167021
+    영업직 11.154735
+데이터엔지니어 11.043831
+     서무 10.752232
+    연구원 10.114049
+   설비op  9.905100
+   사업관리  9.825534
+
+--- [Company Type vs Education Crosstab Table] ---
+education     고졸↑  대학(2,3년)↑  대학교(4년)↑  석사↑  학력무관
+company_type                                     
+공사·공기업          0          2         1    0    47
+대기업            31         22        52    4   151
+외국계             9          3        11    0     2
+일반기업           25         21        58    7   114
+코스닥             9          4        14    0     4
+코스피             5          1         2    0     1
