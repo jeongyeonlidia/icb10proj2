@@ -1,0 +1,130 @@
+=== [1. 턴오버 데이터 마트 초기 검토] ===
+총 행 수: 600개
+총 열 수: 17개
+중복 레코드 수: 0개
+
+--- 결측치 정보 ---
+company                      0
+company_type                 0
+employee_count               0
+primary_sector               0
+title                        0
+registration_date            0
+end_date                     0
+posting_period_days          0
+reposting_interval_days    519
+company_sector_postings      0
+rotation_index               0
+is_toxic_rotation            0
+toxic_jd_score               0
+jd_copy_paste_ratio          0
+turnover_risk_score          0
+turnover_risk_level          0
+link                         0
+dtype: int64
+
+--- 수치형 피처 기술 통계 ---
+       employee_count  ...  turnover_risk_score
+count      600.000000  ...           600.000000
+mean       772.166667  ...            14.389414
+std        674.072891  ...            17.129212
+min         50.000000  ...             0.000000
+25%         50.000000  ...             0.418410
+50%        800.000000  ...             4.498489
+75%       1500.000000  ...            24.908473
+max       1500.000000  ...            67.500000
+
+[8 rows x 7 columns]
+
+--- 범주형 및 바이너리 피처 빈도 ---
+
+[company_type 빈도표]
+company_type
+대기업       260
+일반기업      225
+공사·공기업     50
+코스닥        31
+외국계        25
+코스피         9
+Name: count, dtype: int64
+
+[primary_sector 빈도표]
+primary_sector
+사무직         67
+기술지원        25
+AI(인공지능)    18
+영업관리        16
+기계조작원       14
+데이터분석가      14
+연구원         14
+문서작성        11
+생산관리        10
+단순생산직       10
+Name: count, dtype: int64
+
+[is_toxic_rotation 빈도표]
+is_toxic_rotation
+0    480
+1    120
+Name: count, dtype: int64
+
+[turnover_risk_level 빈도표]
+turnover_risk_level
+Low       484
+Medium    104
+High       12
+Name: count, dtype: int64
+=========================================
+
+=== [2. 데이터 시각화 생성 시작] ===
+차트 1 저장: turnover_01_risk_level_dist.png
+차트 2 저장: turnover_02_toxic_rotation_pie.png
+차트 3 저장: turnover_03_sector_risk_bar.png
+차트 4 저장: turnover_04_rotation_index_hist.png
+차트 5 저장: turnover_05_reposting_interval_box.png
+차트 6 저장: turnover_06_copy_paste_ratio_hist.png
+차트 7 저장: turnover_07_toxic_jd_score_bar.png
+차트 8 저장: turnover_08_company_type_risk_bar.png
+차트 9 저장: turnover_09_high_risk_tfidf_bar.png
+차트 10 저장: turnover_10_risk_vs_toxic_heatmap.png
+=== [시각화 생성 완료] ===
+
+--- [High Risk TF-IDF Table] ---
+  word    score
+    채용 7.624549
+  채용공고 7.341292
+    공고 7.148789
+nh농협은행 6.322749
+    직원 5.682274
+ 2026년 4.499563
+  2026 4.445977
+산전후대체직 4.356546
+ 사무지원직 4.341120
+    하계 3.238842
+   인턴십 3.238842
+ naver 2.763091
+    트랙 2.763091
+  공개채용 2.732591
+   기간제 2.713439
+  청년인턴 2.514769
+ 일반계약직 2.253227
+직무능력중심 2.244482
+  신입사원 2.244482
+    신입 2.185273
+  kist 2.163299
+    3차 2.163299
+260615 2.117760
+    모집 1.977312
+  비즈니스 1.853751
+    통계 1.562392
+   제2차 1.556547
+  프로덕트 1.416548
+   체험형 1.391046
+   관리원 1.360833
+
+--- [Risk Level vs Toxic Rotation Crosstab] ---
+is_toxic_rotation      0   1
+turnover_risk_level         
+High                   0  12
+Low                  464  20
+Medium                16  88
