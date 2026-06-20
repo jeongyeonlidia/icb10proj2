@@ -18,9 +18,11 @@ from dotenv import load_dotenv
 
 # .env 환경 변수 로드
 load_dotenv()
-default_client_id = os.getenv("NAVER_CLIENT_ID", "")
-default_client_secret = os.getenv("NAVER_CLIENT_SECRET", "")
-default_saramin_key = os.getenv("SARAMIN_API_KEY", "")
+
+# st.secrets 우선 조회 후, 없으면 .env 환경 변수를 폴백으로 사용
+default_client_id = st.secrets.get("NAVER_CLIENT_ID", os.getenv("NAVER_CLIENT_ID", ""))
+default_client_secret = st.secrets.get("NAVER_CLIENT_SECRET", os.getenv("NAVER_CLIENT_SECRET", ""))
+default_saramin_key = st.secrets.get("SARAMIN_API_KEY", os.getenv("SARAMIN_API_KEY", ""))
 
 # 모듈 상대 경로 임포트
 from data_generator import generate_trend_data, generate_job_frequency, generate_job_details, generate_industry_data
