@@ -186,3 +186,110 @@ def generate_industry_data():
         })
         
     return pd.DataFrame(records)
+
+
+def load_and_enrich_scraped_data(keywords, file_path="saramin/data/saramin_jobs.csv"):
+    """
+    실제 수집된 사람인 채용공고 CSV 파일을 로드하고, 
+    대시보드 분석 기법에 필요한 추가적인 통계 지표(평점, 급여, 복지점수, 기술 스택 등)를 
+    기업 규모별 패턴에 맞춰 보강하여 DataFrame으로 반환합니다.
+    파일이 존재하지 않는 경우 원래의 모의 데이터 생성기로 폴백합니다.
+    """
+    if not os.path.exists(file_path):
+        return generate_job_details(keywords)
+        
+    try:
+        df_real = pd.read_csv(file_path)
+        
+        enriched_records = []
+        industries = ["IT/웹/통신", "제조/화학", "서비스업", "금융/은행", "교육/미디어"]
+        tech_pool = ["Python", "Java", "JavaScript", "React", "AWS", "Spring", "Docker", "SQL", "Git", "Kubernetes", "TypeScript", "Node.js"]
+        welfare_pool = ["유연근무제", "도서구입비지원", "사내스낵바", "자녀학자금", "장기근근속포상", "건강검진지원", "사내대출", "통신비지원", "반차/반반차"]
+        
+        for idx, row in df_real.iterrows():
+            comp_type = row["company_type"] if pd.notna(row["company_type"]) else "일반기업"
+            # 대시보드 내 type 명칭 호환성 (대기업, 중견기업, 중소기업, 스타트업 중 하나로 매핑)
+            if "대기업" in str(comp_type):
+                mapped_type = "대기업"
+            elif "중견" in str(comp_type):
+                mapped_type = "중견기업"
+            elif "스타트업" in str(comp_type):
+                mapped_type = "스타트업"
+            else:
+                mapped_type = random.choice(["중소기업", "중견기업"])
+                
+            # 1. 평점 보강
+            if mapped_type == "대기업":
+                rating = round(np.random.normal(3.8, 0.4), 2)
+            elif mapped_type == "중견기업":
+                rating = round(np.random.normal(3.4, 0.5), 2)
+            elif mapped_type == "스타트업":
+                rating = round(np.random.normal(3.5, 0.7), 2)
+            else:
+                rating = round(np.random.normal(2.8, 0.5), 2)
+            rating = np.clip(rating, 1.0, 5.0)
+            
+            # 2. 연봉 보강
+            base_salary = {"대기업": 5500, "중견기업": 4200, "스타트업": 4000, "중소기업": 3000}[mapped_type]
+            rating_bonus = (rating - 3.0) * 800
+            salary = int(base_salary + rating_bonus + np.random.normal(0, 400))
+            salary = np.clip(salary, 2600, 12000)
+            
+            # 3. 복지 정보 보강
+            welfare_count_map = {"대기업": (6, 9), "중견기업": (4, 7), "스타트업": (4, 8), "중소기업": (1, 4)}
+            min_w, max_w = welfare_count_map[mapped_type]
+            w_count = random.randint(min_w, max_w)
+            active_welfares = random.sample(welfare_pool, w_count)
+            welfare_score = int(w_count * 10 + rating * 2.5 + random.randint(0, 15))
+            welfare_score = np.clip(welfare_score, 10, 100)
+            
+            # 4. 직무 분야(sectors) 또는 제목에서 스택 매칭
+            active_techs = []
+            title_lower = str(row["title"]).lower() if pd.notna(row["title"]) else ""
+            sectors_str = str(row["sectors"]).lower() if pd.notna(row["sectors"]) else ""
+            
+            # 실제 스택명과 매핑 검색
+            for tech in tech_pool:
+                if tech.lower() in title_lower or tech.lower() in sectors_str:
+                    active_techs.append(tech)
+            
+            # 만약 매칭되는 스택이 없으면 임의로 1~3개 부여
+            if not active_techs:
+                active_techs = random.sample(tech_pool, random.randint(1, 3))
+                
+            # 대시보드 분석용 키워드 매핑 (검색 키워드들과 엮어줌)
+            matched_kw = "Python" # 기본 폴백
+            for kw in keywords:
+                if kw.lower() in title_lower or kw.lower() in sectors_str:
+                    matched_kw = kw
+                    break
+            
+            # 5. 산업군 매핑
+            industry = "IT/웹/통신"
+            if pd.notna(row["sectors"]):
+                sec = row["sectors"]
+                if any(x in sec for x in ["의료", "수의", "병원", "간호"]):
+                    industry = "의료/제약"
+                elif any(x in sec for x in ["사무", "행정", "비서", "정산"]):
+                    industry = "서비스업"
+                elif any(x in sec for x in ["증권", "금융", "예산", "자금"]):
+                    industry = "금융/은행"
+                    
+            enriched_records.append({
+                "company": row["company"],
+                "type": mapped_type,
+                "industry": industry,
+                "keyword": matched_kw,
+                "rating": rating,
+                "salary": salary,
+                "welfare_score": welfare_score,
+                "welfare_list": active_welfares,
+                "welfare_count": w_count,
+                "tech_stack": active_techs,
+                "description": f"{row['title']} (직무: {row['sectors']})"
+            })
+            
+        return pd.DataFrame(enriched_records)
+    except Exception as e:
+        print(f"실제 CSV 로드 실패, 모의 데이터로 대체합니다: {e}")
+        return generate_job_details(keywords)

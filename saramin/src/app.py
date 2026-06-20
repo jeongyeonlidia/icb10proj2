@@ -26,7 +26,11 @@ default_client_secret = st.secrets.get("NAVER_CLIENT_SECRET", os.getenv("NAVER_C
 default_saramin_key = st.secrets.get("SARAMIN_API_KEY", os.getenv("SARAMIN_API_KEY", ""))
 
 # 모듈 상대 경로 임포트
-from data_generator import generate_trend_data, generate_job_frequency, generate_job_details, generate_industry_data
+from data_generator import (
+    generate_trend_data, generate_job_frequency, 
+    generate_job_details, generate_industry_data, 
+    load_and_enrich_scraped_data
+)
 from pages_content import (
     render_overview, render_trends_analysis, render_freq_analysis, 
     render_details_analysis, render_welfare_analysis, render_industry_analysis
@@ -180,10 +184,10 @@ def get_job_freq(keywords, start, end):
     return generate_job_frequency(keywords, start, end)
 df_freq = get_job_freq(keywords, start_date, end_date)
 
-# 3. 공고 상세 데이터
+# 3. 공고 상세 데이터 (실제 수집 데이터 우선 로드)
 @st.cache_data(show_spinner="상세 공고 내용을 매칭하는 중입니다...")
 def get_job_details(keywords):
-    return generate_job_details(keywords, n_samples=300)
+    return load_and_enrich_scraped_data(keywords)
 df_jobs = get_job_details(keywords)
 
 # 4. 산업군별 분석 데이터
