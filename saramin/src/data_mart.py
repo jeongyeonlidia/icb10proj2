@@ -1,146 +1,221 @@
 """
-이 모듈은 사람인 채용공고 크롤링 데이터를 기반으로 인력 턴오버(퇴사율) 리스크 분석을 수행하기 위해
-비즈니스 데이터 마트(Data Mart)를 설계하고 피처 엔지니어링(Feature Engineering)을 처리하는 로직을 제공합니다.
+이 모듈은 사람인 채용공고 크롤링 데이터를 기반으로 인력 턴오버(퇴사율) 리스크 분석을 심도 있게 수행하기 위해
+비즈니스 데이터 마트(Data Mart)를 구축하고 고도화된 피처 엔지니어링(Feature Engineering)을 처리합니다.
 
-주요 구현 사항:
-1. 시장 평균 공고 게시 기간의 중앙값(12일)을 기준으로 한 기간 편차(Duration Deviation) 계산
-2. 회사별 및 직무별 공고 재등록 빈도(Re-posting Frequency) 집계
-3. 기업 규모별 연봉 격차 및 복리후생 지표 산출
-4. 직무 기술 설명(JD)의 텍스트 밀도 및 요구 스택 수 수치화
-5. 인사팀 관점의 가중치 기반 '턴오버 위험 점수(Turnover Risk Score)' 도출 및 데이터 마트 CSV 저장
+주요 피처 엔지니어링 로직:
+1. 회사별 '공고 회전문 지수(Rotation Index)' 산출:
+   - 기업 규모(company_type)에 따라 가상의 국민연금 가입 종사자 수를 매핑하여 분모로 삼고,
+     특정 회사-직무별 연간 누적 공고 건수를 분자로 삼아 회전문 지수를 구합니다.
+2. 직무별 기저값(Baseline 12일) 대비 '공고 재등록 주기(Interval)' 계산 및 '독박 직무(Toxic Rotation)' 판정:
+   - 등록 경과일과 게시 기간을 기반으로 공고 등록일(registration_date) 및 마감일(end_date)을 역산합니다.
+   - 동일 기업 내 동일 직무 분류에 대해 이전 공고의 마감일과 다음 공고의 등록일 간격(Time Delta)을 연산하고,
+     2주 이내(14일 이하) 재등록 현상이 반복되는지 탐지하여 독박 직무 여부를 판정합니다.
+3. 텍스트 마이닝을 통한 JD(직무기술서) 특징 추출 및 독성/유사도 스코어 산출:
+   - 추상적이고 회피적인 키워드('가족 같은', '열정', '급구' 등)의 포함 여부를 스코어링하고,
+     동일 기업 내 공고 텍스트 간 자카드 유사도를 계산하여 '복사-붙여넣기 비율(Copy-Paste Ratio)'을 측정합니다.
 """
 
 import os
+import re
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 
-# 상대경로 정의
+# 파일 경로 정의
 INPUT_CSV_PATH = "saramin/data/saramin_jobs.csv"
 OUTPUT_DATAMART_PATH = "saramin/data/saramin_turnover_datamart.csv"
 
-def build_turnover_data_mart():
+def jaccard_similarity(str1, str2):
     """
-    사람인 원본 수집 데이터를 읽어 퇴사율 분석용 데이터 마트(Data Mart)를 구축합니다.
+    두 텍스트 간의 자카드 유사도(Jaccard Similarity)를 단어 수준에서 계산합니다.
+    """
+    words1 = set(re.findall(r'\w+', str(str1)))
+    words2 = set(re.findall(r'\w+', str(str2)))
+    if not words1 or not words2:
+        return 0.0
+    intersection = words1.intersection(words2)
+    union = words1.union(words2)
+    return len(intersection) / len(union)
+
+def build_advanced_turnover_data_mart():
+    """
+    사람인 채용 공고 데이터를 로드하여 회전문 지수, 재등록 주기, JD 텍스트 특징을 수치화한
+    퇴사율 분석용 비즈니스 데이터 마트를 구축합니다.
     """
     if not os.path.exists(INPUT_CSV_PATH):
-        raise FileNotFoundError(f"원본 데이터 파일이 없습니다: {INPUT_CSV_PATH}")
+        raise FileNotFoundError(f"원본 데이터 파일이 존재하지 않습니다: {INPUT_CSV_PATH}")
         
     df = pd.read_csv(INPUT_CSV_PATH)
     
-    # 0. 데이터 전처리 및 정비
-    # posting_period_days 결측치/알수없음 처리 및 수치형 변환
-    df["posting_period_days_clean"] = pd.to_numeric(df["posting_period_days"], errors="coerce")
+    # 0. 날짜 파생변수 생성 (기준일은 데이터 수집 시점인 2026-06-20)
+    base_date = datetime(2026, 6, 20)
     
-    # 분석용 데이터프레임 복사
-    dm = df.copy()
+    # 등록일(registration_date)과 마감일(end_date) 생성
+    df["reg_days_ago_clean"] = pd.to_numeric(df["reg_days_ago"], errors="coerce").fillna(0).astype(int)
+    df["posting_period_clean"] = pd.to_numeric(df["posting_period_days"], errors="coerce").fillna(12).astype(int)
     
-    # 1. 공고 유지 기간 격차 및 편차 피처 생성 (시장 중앙값 12일 기준)
-    market_median_duration = 12
-    # 단순 편차 (실제 기간 - 시장 중앙값)
-    dm["duration_deviation"] = dm["posting_period_days_clean"] - market_median_duration
-    # 절대 편차 (중앙값과의 격차 수준)
-    dm["abs_duration_deviation"] = dm["duration_deviation"].abs()
-    # 공고가 시장 평균 대비 비정상적으로 짧은지 여부 (예: 조기 마감 또는 채용 급구) -> 1 or 0
-    dm["is_short_posting"] = (dm["posting_period_days_clean"] < market_median_duration).astype(int)
-    # 공고가 시장 평균 대비 비정상적으로 긴지 여부 (예: 구인난 또는 상시 채용) -> 1 or 0
-    dm["is_long_posting"] = (dm["posting_period_days_clean"] > market_median_duration).astype(int)
+    df["registration_date"] = df["reg_days_ago_clean"].apply(lambda x: base_date - timedelta(days=x))
+    df["end_date"] = df.apply(lambda row: row["registration_date"] + timedelta(days=row["posting_period_clean"]), axis=1)
     
-    # 2. 동일 회사 및 직무별 공고 재등록 빈도(Re-posting Frequency) 집계
-    # 회사별 총 채용공고 등록 건수
-    company_counts = dm["company"].value_counts().to_dict()
-    dm["company_reposting_count"] = dm["company"].map(company_counts)
+    # 1. 1️⃣ 회사별 '공고 회전문 지수 (Rotation Index)' 파생변수 생성
+    # 국민연금 기준 가상의 회사 전체 종사자 수 매핑
+    employee_map = {
+        "대기업": 1500,
+        "코스피": 1000,
+        "공사·공기업": 800,
+        "코스닥": 300,
+        "외국계": 150,
+        "일반기업": 50
+    }
+    df["employee_count"] = df["company_type"].map(employee_map).fillna(40).astype(int)
     
-    # 개별 직무 분야(sectors) 분할 후 빈도 분석을 위해 텍스트 파싱
-    # sectors는 쉼표로 연결되어 있으므로 첫 번째 대표 직무를 기준으로 매핑하거나 전체 매핑
-    dm["primary_sector"] = dm["sectors"].fillna("").apply(lambda x: [s.strip() for s in x.split(",")][0] if x else "기타")
-    sector_counts = dm["primary_sector"].value_counts().to_dict()
-    dm["sector_reposting_count"] = dm["primary_sector"].map(sector_counts)
+    # 첫 번째 대표 직무를 주 직무(primary_sector)로 파싱
+    df["primary_sector"] = df["sectors"].fillna("").apply(
+        lambda x: [s.strip() for s in x.split(",")][0] if x else "기타"
+    )
     
-    # 3. 기업 특징 피처 엔지니어링 (연봉 및 복지 지표 보강 데이터 시뮬레이션 기반 모델링)
-    # 실제 수집 데이터의 salary가 대부분 '면접 후 협의'이므로 기업 규모와 연계된 연봉 추정값 부여
-    # (data_generator.py의 가이드 모델 활용)
-    salary_map = {"대기업": 5800, "일반기업": 3800, "공사·공기업": 4200, "코스닥": 4500, "외국계": 4800, "코스피": 5200}
-    dm["estimated_salary"] = dm["company_type"].map(salary_map).fillna(3500)
+    # 회사별 & 직무별 총 공고 등록 횟수
+    company_sector_counts = df.groupby(["company", "primary_sector"]).size().to_dict()
+    df["company_sector_postings"] = df.apply(
+        lambda row: company_sector_counts.get((row["company"], row["primary_sector"]), 1), axis=1
+    )
     
-    # 복지 데이터 가공: sectors 또는 타이틀에 포함된 키워드로 대략적인 복지 매핑
-    # 텍스트에 포함될 만한 대표 복지 키워드 매칭
-    title_and_sector = (dm["title"] + " " + dm["sectors"]).fillna("")
-    dm["has_flexible_work"] = title_and_sector.str.contains("유연근무|시차출퇴근|재택|자율", case=False).astype(int)
-    dm["has_snack_bar"] = title_and_sector.str.contains("간식|스낵|음료|커피", case=False).astype(int)
-    dm["has_incentive"] = title_and_sector.str.contains("인센티브|성과급|보너스", case=False).astype(int)
+    # Rotation Index 산출: 특정 직무 공고 등록 횟수 / 회사 전체 종사자 수
+    df["rotation_index"] = df["company_sector_postings"] / df["employee_count"]
     
-    # 가상의 복지 개수 지표 생성 (기업 규모별 차등화)
-    welfare_count_base = {"대기업": 7, "일반기업": 3, "공사·공기업": 5, "코스닥": 4, "외국계": 5, "코스피": 6}
-    dm["estimated_welfare_count"] = dm["company_type"].map(welfare_count_base).fillna(2)
-    # 복지 지표 보완 (발견된 키워드 추가 합산)
-    dm["estimated_welfare_count"] += (dm["has_flexible_work"] + dm["has_snack_bar"] + dm["has_incentive"])
+    # 2. 2️⃣ 직무별 기저값(12일) 대비 '공고 재등록 주기(Interval)' 계산 및 '독박 직무' 판정
+    # 동일 기업 내에서 동일한 직무의 공고 간 등록 간격을 계산하기 위해 정렬
+    df_sorted = df.sort_values(by=["company", "primary_sector", "registration_date"])
     
-    # 4. JD(Job Description) 형태 및 정보 밀도 분석
-    # 공고 제목 글자 수 (정보성 판단 지표)
-    dm["title_length"] = dm["title"].fillna("").apply(len)
-    # 요구되는 직무 키워드 개수
-    dm["sector_count"] = dm["sectors"].fillna("").apply(lambda x: len(x.split(",")) if x else 0)
+    # 동일 회사-직무 그룹화하여 이전 마감일과 다음 등록일의 차이 계산
+    df_sorted["prev_end_date"] = df_sorted.groupby(["company", "primary_sector"])["end_date"].shift(1)
     
-    # 5. 인사팀 관점의 가중치 기반 '턴오버 위험 점수 (Turnover Risk Score)' 산출 (100점 만점)
-    # 가설 설정: 
-    # - 연봉이 낮을수록 턴오버가 높다. (가중치 20%)
-    # - 복리후생 혜택이 적을수록 턴오버가 높다. (가중치 20%)
-    # - 동일 회사의 재등록 빈도가 높을수록 턴오버가 높다. (가중치 30%)
-    # - 공고 유지 기간의 격차가 클수록 (너무 짧아 즉시이탈이 많거나, 너무 길어 장기공석) 턴오버 리스크 징후이다. (가중치 30%)
+    # 간격(Interval) 일수 계산 (등록일 - 이전 마감일)
+    def calc_interval(row):
+        if pd.isna(row["prev_end_date"]):
+            return np.nan
+        delta = (row["registration_date"] - row["prev_end_date"]).days
+        return delta
+        
+    df_sorted["reposting_interval_days"] = df_sorted.apply(calc_interval, axis=1)
     
-    # 정규화 함수 (Min-Max Scaling)
-    def min_max_normalize(series, invert=False):
-        min_val = series.min()
-        max_val = series.max()
-        if max_val == min_val:
+    # 독박 직무(Toxic Rotation) 판정: 
+    # 동일 기업-직무 내에서 2주(14일) 이내 재등록이 발생하는 패턴 탐지
+    # 데이터셋의 시간 범위가 10일 이내이므로(reg_days_ago 0~9일) 14일 이하의 리프레시 횟수를 카운트함
+    df_sorted["is_under_14_days"] = (df_sorted["reposting_interval_days"] <= 14).astype(int)
+    
+    toxic_group = df_sorted.groupby(["company", "primary_sector"])["is_under_14_days"].sum().reset_index()
+    # 수집 데이터 크기가 600개이므로, 9일간의 범위 내에서 1회 이상 재등록이 확인되면 회전문이 돌기 시작하는 신호로 판단
+    toxic_group["is_toxic_rotation"] = (toxic_group["is_under_14_days"] >= 1).astype(int)
+    
+    # 원본 데이터에 병합 (고유 키인 link를 기준으로 1:1 결합 보장)
+    df_merged = pd.merge(
+        df, 
+        df_sorted[["link", "reposting_interval_days"]], 
+        on="link",
+        how="left"
+    )
+    
+    df_merged = pd.merge(
+        df_merged,
+        toxic_group[["company", "primary_sector", "is_toxic_rotation"]],
+        on=["company", "primary_sector"],
+        how="left"
+    )
+    
+    # 3. 3️⃣ 텍스트 마이닝: JD 특징 추출 및 독성/유사도 분석
+    # 추상적 단어 및 턴오버 유발성 키워드 목록
+    toxic_keywords = ["가족", "가족같은", "열정", "급구", "긴급", "인내", "보조", "초보", "단순", "야근"]
+    
+    def calc_toxic_jd_score(row):
+        text = str(row["title"]) + " " + str(row["sectors"])
+        score = sum(1 for kw in toxic_keywords if kw in text)
+        return score
+        
+    df_merged["toxic_jd_score"] = df_merged.apply(calc_toxic_jd_score, axis=1)
+    
+    # 동일 회사 내 공고 간 텍스트 유사도 (자카드) 계산 -> 복사 붙여넣기 지수
+    df_sorted_copy = df_merged.sort_values(by=["company", "registration_date"])
+    df_sorted_copy["prev_title"] = df_sorted_copy.groupby("company")["title"].shift(1)
+    
+    def calc_title_similarity(row):
+        if pd.isna(row["prev_title"]) or pd.isna(row["title"]):
+            return 0.0
+        return jaccard_similarity(row["title"], row["prev_title"])
+        
+    df_sorted_copy["copy_paste_ratio"] = df_sorted_copy.apply(calc_title_similarity, axis=1)
+    
+    # 원본 병합 (고유 키인 link 기준으로 1:1 결합 보장)
+    df_final = pd.merge(
+        df_merged,
+        df_sorted_copy[["link", "copy_paste_ratio"]],
+        on="link",
+        how="left"
+    )
+    
+    # 4. 분석 위험 점수 통합 재산정 (100점 만점)
+    # Rotation Index, Toxic Rotation 여부, 복사 붙여넣기 유사도, 독성 키워드 스코어를 조합
+    # - rotation_index 위험도 (25%)
+    # - is_toxic_rotation 여부 (25%)
+    # - copy_paste_ratio 유사도 (25%)
+    # - toxic_jd_score 위험도 (25%)
+    
+    def normalize(series):
+        min_v = series.min()
+        max_v = series.max()
+        if max_v == min_v:
             return pd.Series(0.5, index=series.index)
-        normalized = (series - min_val) / (max_val - min_val)
-        if invert:
-            return 1.0 - normalized
-        return normalized
-
-    # 각 요인별 위험도 산출 (0 ~ 1 범위)
-    salary_risk = min_max_normalize(dm["estimated_salary"], invert=True)
-    welfare_risk = min_max_normalize(dm["estimated_welfare_count"], invert=True)
-    reposting_risk = min_max_normalize(dm["company_reposting_count"])
-    duration_risk = min_max_normalize(dm["abs_duration_deviation"].fillna(0))
+        return (series - min_v) / (max_v - min_v)
+        
+    norm_rot = normalize(df_final["rotation_index"])
+    norm_toxic = df_final["is_toxic_rotation"].fillna(0)
+    norm_copy = normalize(df_final["copy_paste_ratio"].fillna(0))
+    norm_jd = normalize(df_final["toxic_jd_score"])
     
-    # 최종 가중치 합산 턴오버 위험 점수 계산
-    dm["turnover_risk_score"] = (
-        (salary_risk * 0.20) +
-        (welfare_risk * 0.20) +
-        (reposting_risk * 0.30) +
-        (duration_risk * 0.30)
+    df_final["turnover_risk_score"] = (
+        (norm_rot * 0.25) +
+        (norm_toxic * 0.25) +
+        (norm_copy * 0.25) +
+        (norm_jd * 0.25)
     ) * 100
     
-    # 위험 등급 분류 (High, Medium, Low)
-    dm["turnover_risk_level"] = pd.cut(
-        dm["turnover_risk_score"], 
-        bins=[0, 40, 70, 100], 
+    # 등급 분류 (High, Medium, Low)
+    df_final["turnover_risk_level"] = pd.cut(
+        df_final["turnover_risk_score"],
+        bins=[0, 30, 60, 100],
         labels=["Low", "Medium", "High"],
         include_lowest=True
     )
     
-    # 6. 불필요한 보조 컬럼 제거 및 정렬
-    columns_order = [
-        "company", "company_type", "primary_sector", "title", "title_length", "sector_count",
-        "posting_period_days_clean", "duration_deviation", "abs_duration_deviation",
-        "is_short_posting", "is_long_posting", "company_reposting_count", "sector_reposting_count",
-        "estimated_salary", "estimated_welfare_count", "has_flexible_work", "has_snack_bar", "has_incentive",
-        "turnover_risk_score", "turnover_risk_level", "link"
+    # 5. 불필요 임시 컬럼 정리 및 정렬
+    columns_to_save = [
+        "company", "company_type", "employee_count", "primary_sector", "title", 
+        "registration_date", "end_date", "posting_period_clean", "reposting_interval_days",
+        "company_sector_postings", "rotation_index", "is_toxic_rotation", 
+        "toxic_jd_score", "copy_paste_ratio", "turnover_risk_score", "turnover_risk_level", "link"
     ]
-    dm_final = dm[columns_order].rename(columns={"posting_period_days_clean": "posting_period_days"})
     
-    # 결과 파일 저장
+    df_datamart = df_final[columns_to_save].rename(columns={
+        "posting_period_clean": "posting_period_days",
+        "copy_paste_ratio": "jd_copy_paste_ratio"
+    })
+    
+    # CSV 저장
     os.makedirs(os.path.dirname(OUTPUT_DATAMART_PATH), exist_ok=True)
-    dm_final.to_csv(OUTPUT_DATAMART_PATH, index=False, encoding="utf-8-sig")
+    df_datamart.to_csv(OUTPUT_DATAMART_PATH, index=False, encoding="utf-8-sig")
     
-    print(f"턴오버 분석 비즈니스 데이터 마트 구축 성공: {OUTPUT_DATAMART_PATH}")
-    print(f"전체 레코드 수: {len(dm_final)}개")
-    print(f"위험 수준 분포:\n{dm_final['turnover_risk_level'].value_counts()}")
+    print("\n=== [고급 턴오버 데이터 마트 구축 결과] ===")
+    print(f"저장 경로: {OUTPUT_DATAMART_PATH}")
+    print(f"전체 레코드 수: {len(df_datamart)}개")
+    print(f"독박 직무(Toxic Rotation) 탐지 수: {df_datamart['is_toxic_rotation'].sum()}건")
+    print("\n--- 위험도 레벨별 통계 ---")
+    print(df_datamart["turnover_risk_level"].value_counts())
     
-    return dm_final
-
-if __name__ == "__main__":
-    build_turnover_data_mart()
+    # 텍스트 마이닝 군집별 Gap 분석 요약 출력
+    print("\n--- [텍스트 마이닝 Gap 분석 요약] ---")
+    high_risk_companies = df_datamart[df_datamart["turnover_risk_score"] >= 50]["company"].unique()
+    low_risk_companies = df_datamart[df_datamart["turnover_risk_score"] < 25]["company"].unique()
+    print(f"위험 군집 기업 수 (점수 >= 50): {len(high_risk_companies)}개")
+    print(f"우수 군집 기업 수 (점수 < 25): {len(low_risk_companies)}개")
+    
+    return df_datamart
