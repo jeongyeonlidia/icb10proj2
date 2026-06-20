@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 
 # .env 환경 변수 로드
 load_dotenv()
+load_dotenv(dotenv_path="saramin/.env")
 
 # st.secrets 우선 조회 후, 없으면 .env 환경 변수를 폴백으로 사용
 default_client_id = st.secrets.get("NAVER_CLIENT_ID", os.getenv("NAVER_CLIENT_ID", ""))
