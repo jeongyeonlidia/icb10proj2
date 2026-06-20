@@ -15,6 +15,7 @@ import pandas as pd
 import numpy as np
 import random
 from datetime import datetime, timedelta
+import os
 
 def generate_trend_data(keywords, start_date, end_date):
     """
