@@ -149,7 +149,10 @@ def generate_job_details(keywords, n_samples=200):
             "welfare_list": active_welfares,
             "welfare_count": w_count,
             "tech_stack": active_techs,
-            "description": job_desc
+            "description": job_desc,
+            "reg_info": "오늘 등록",
+            "reg_days_ago": 0,
+            "posting_period_days": 14
         })
         
     return pd.DataFrame(records)
@@ -286,7 +289,10 @@ def load_and_enrich_scraped_data(keywords, file_path="saramin/data/saramin_jobs.
                 "welfare_list": active_welfares,
                 "welfare_count": w_count,
                 "tech_stack": active_techs,
-                "description": f"{row['title']} (직무: {row['sectors']})"
+                "description": f"{row['title']} (직무: {row['sectors']})",
+                "reg_info": row.get("reg_info", "알수없음"),
+                "reg_days_ago": int(row.get("reg_days_ago", 0)) if pd.notna(row.get("reg_days_ago")) else 0,
+                "posting_period_days": row.get("posting_period_days", "알수없음")
             })
             
         return pd.DataFrame(enriched_records)

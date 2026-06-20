@@ -14,6 +14,8 @@ import json
 import pandas as pd
 from bs4 import BeautifulSoup
 import os
+import re
+from datetime import datetime, timedelta
 
 def scrape_saramin_first_page():
     url = "https://www.saramin.co.kr/zf_user/jobs/public/list"
@@ -120,12 +122,53 @@ def scrape_saramin_first_page():
             # 4. 지원 정보 및 마감일
             support_info = item.find("div", class_="support_info")
             deadline = ""
+            reg_info = ""
+            reg_days_ago = 0
+            posting_period_days = "알수없음"
+            
             if support_info:
                 support_detail = support_info.find("p", class_="support_detail")
                 if support_detail:
                     date_span = support_detail.find("span", class_="date")
                     if date_span:
                         deadline = date_span.get_text(strip=True)
+                    
+                    deadlines_span = support_detail.find("span", class_="deadlines")
+                    if deadlines_span:
+                        reg_info = deadlines_span.get_text(strip=True)
+                        
+                        # 몇 일 전 등록/수정인지 계산
+                        if any(x in reg_info for x in ["시간 전", "분 전", "초 전", "방금", "오늘"]):
+                            reg_days_ago = 0
+                        elif "일 전" in reg_info:
+                            match = re.search(r'(\d+)일 전', reg_info)
+                            if match:
+                                reg_days_ago = int(match.group(1))
+                        
+                        # 공고 게시 간격 (등록일 ~ 마감일) 계산
+                        today = datetime.today()
+                        reg_date = today - timedelta(days=reg_days_ago)
+                        
+                        end_date = None
+                        if "D-" in deadline:
+                            match_d = re.search(r'D-(\d+)', deadline)
+                            if match_d:
+                                days_left = int(match_d.group(1))
+                                end_date = today + timedelta(days=days_left)
+                        elif "~" in deadline:
+                            match_date = re.search(r'~(\d{2})\.(\d{2})', deadline)
+                            if match_date:
+                                month = int(match_date.group(1))
+                                day = int(match_date.group(2))
+                                try:
+                                    end_date = datetime(today.year, month, day)
+                                    if end_date < reg_date:
+                                        end_date = datetime(today.year + 1, month, day)
+                                except:
+                                    pass
+                        
+                        if end_date:
+                            posting_period_days = (end_date - reg_date).days
             
             # 데이터 수집 딕셔너리 생성
             jobs_list.append({
@@ -138,7 +181,10 @@ def scrape_saramin_first_page():
                 "career": career,
                 "education": education,
                 "salary": salary,
-                "deadline": deadline
+                "deadline": deadline,
+                "reg_info": reg_info,
+                "reg_days_ago": reg_days_ago,
+                "posting_period_days": posting_period_days
             })
             
         # DataFrame 변환 및 저장

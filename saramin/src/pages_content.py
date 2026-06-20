@@ -310,8 +310,32 @@ def render_details_analysis(keywords, df_jobs):
     st.markdown(f"선택한 필터 조건 결과: **총 {len(df_filtered)} 건**")
     
     # 테이블 표시 및 클릭 시 상세 보기 지원
-    df_table = df_filtered[["company", "type", "industry", "rating", "salary", "tech_stack", "welfare_score", "description"]]
-    st.dataframe(df_table, use_container_width=True)
+    cols_to_show = ["company", "type", "industry", "rating", "salary", "tech_stack", "welfare_score", "description"]
+    
+    # 실제 수집 데이터에 날짜 필드들이 있다면 표시 목록에 추가
+    extra_cols = ["reg_info", "reg_days_ago", "posting_period_days"]
+    for c in extra_cols:
+        if c in df_filtered.columns:
+            cols_to_show.append(c)
+            
+    df_table = df_filtered[cols_to_show]
+    
+    # 한글 컬럼명 매핑
+    rename_dict = {
+        "company": "기업명",
+        "type": "기업 규모",
+        "industry": "산업군",
+        "rating": "평점",
+        "salary": "연봉 (만원)",
+        "tech_stack": "요구 기술",
+        "welfare_score": "복지 점수",
+        "description": "공고 상세 및 등록 정보",
+        "reg_info": "등록 시점",
+        "reg_days_ago": "경과 일수",
+        "posting_period_days": "총 공고 기간 (일)"
+    }
+    df_table_renamed = df_table.rename(columns=rename_dict)
+    st.dataframe(df_table_renamed, use_container_width=True)
 
 
 def render_welfare_analysis(df_jobs):
