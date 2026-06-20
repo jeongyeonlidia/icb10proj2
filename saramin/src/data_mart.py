@@ -37,6 +37,17 @@ def jaccard_similarity(str1, str2):
     union = words1.union(words2)
     return len(intersection) / len(union)
 
+def normalize_company_name(name):
+    """
+    회사명에서 (주), (유), 주식회사, 유한회사 등의 지칭어와 공백을 제거하여 정규화합니다.
+    """
+    if pd.isna(name):
+        return ""
+    name = str(name).strip()
+    name = re.sub(r'\(주\)|\(유\)|\(합\)|\(재\)|\(사\)|\(복\)|\(주식회사\)|주식회사|유한회사', '', name)
+    name = re.sub(r'\s+', '', name)
+    return name
+
 def build_advanced_turnover_data_mart():
     """
     사람인 채용 공고 데이터를 로드하여 회전문 지수, 재등록 주기, JD 텍스트 특징을 수치화한
@@ -58,7 +69,33 @@ def build_advanced_turnover_data_mart():
     df["end_date"] = df.apply(lambda row: row["registration_date"] + timedelta(days=row["posting_period_clean"]), axis=1)
     
     # 1. 1️⃣ 회사별 '공고 회전문 지수 (Rotation Index)' 파생변수 생성
-    # 국민연금 기준 가상의 회사 전체 종사자 수 매핑
+    # 국민연금 가입 사업장 실제 종사자 수 연동
+    nps_path = "nps/data/국민연금공단_국민연금 가입 사업장 내역_20260521.csv"
+    nps_map = {}
+    
+    if os.path.exists(nps_path):
+        try:
+            # 대량의 nps 데이터를 청크 단위로 빠르게 읽어 매핑 딕셔너리 구축
+            chunks = pd.read_csv(
+                nps_path, 
+                usecols=["사업장명", "가입자수"], 
+                encoding="cp949", 
+                chunksize=50000
+            )
+            for chunk in chunks:
+                chunk["norm_name"] = chunk["사업장명"].apply(normalize_company_name)
+                for _, row in chunk.iterrows():
+                    norm_n = row["norm_name"]
+                    if not norm_n:
+                        continue
+                    users = int(row["가입자수"])
+                    # 중복된 이름이 있을 시 가입자 수가 가장 큰 사업장 기준 매칭
+                    if norm_n not in nps_map or users > nps_map[norm_n]:
+                        nps_map[norm_n] = users
+        except Exception as e:
+            print(f"국민연금 실제 데이터 로드 오류: {e}")
+            
+    # 가상 기준 폴백용 임시 매핑
     employee_map = {
         "대기업": 1500,
         "코스피": 1000,
@@ -67,7 +104,17 @@ def build_advanced_turnover_data_mart():
         "외국계": 150,
         "일반기업": 50
     }
-    df["employee_count"] = df["company_type"].map(employee_map).fillna(40).astype(int)
+    
+    def get_actual_employee_count(row):
+        comp = row["company"]
+        norm_comp = normalize_company_name(comp)
+        if norm_comp in nps_map:
+            return nps_map[norm_comp]
+        # 매칭되는 사업장이 없는 경우 기존 기업규모별 가상 수치로 폴백
+        comp_type = row["company_type"]
+        return employee_map.get(comp_type, 40)
+        
+    df["employee_count"] = df.apply(get_actual_employee_count, axis=1).astype(int)
     
     # 첫 번째 대표 직무를 주 직무(primary_sector)로 파싱
     df["primary_sector"] = df["sectors"].fillna("").apply(
