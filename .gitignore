@@ -88,3 +88,7 @@ secrets.toml
 !.streamlit/
 !.gitignore
 
+# 크롬 브라우저 프로필 및 캐시 (CDP, persistent 등)
+*chrome_profile/
+*chrome_cdp_profile/
+*chrome_persistent_profile/
