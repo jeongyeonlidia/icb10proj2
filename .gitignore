@@ -92,3 +92,7 @@ secrets.toml
 *chrome_profile/
 *chrome_cdp_profile/
 *chrome_persistent_profile/
+
+# project2 분석용 실제 데이터 강제 포함 (Streamlit Cloud 배포 연동용)
+!project2/data/recruit_processed.db
+!project2/data/integrated/naver_weekly_insights.json
