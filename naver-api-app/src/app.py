@@ -156,7 +156,7 @@ for a in ages:
     age_codes.extend(age_map[a])
 
 # 3. 메뉴 이동
-menu = st.sidebar.selectbox(
+menu = st.sidebar.radio(
     "📋 대시보드 페이지 이동", 
     [
         "🏠 홈 및 사용 가이드", 
